@@ -1,6 +1,19 @@
+import 'package:accesibus/Components/Appbar.dart';
 import 'package:flutter/material.dart';
+import 'package:firebase_database/firebase_database.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:math';
+import 'dart:async';
+import 'package:flutter_vibrate/flutter_vibrate.dart';
 
-void main() {
+
+void main() async{
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await Firebase.initializeApp();
   runApp(const MyApp());
 }
 
@@ -11,105 +24,217 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
+      title: 'AccessiBus',
       theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // Try running your application with "flutter run". You'll see the
-        // application has a blue toolbar. Then, without quitting the app, try
-        // changing the primarySwatch below to Colors.green and then invoke
-        // "hot reload" (press "r" in the console where you ran "flutter run",
-        // or simply save your changes to "hot reload" in a Flutter IDE).
-        // Notice that the counter didn't reset back to zero; the application
-        // is not restarted.
-        primarySwatch: Colors.blue,
+        primarySwatch: Colors.blueGrey,
+        brightness: Brightness.dark,
       ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
+      home: const BlindPage(title: 'AccessiBus'),
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({Key? key, required this.title}) : super(key: key);
-
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
+class BlindPage extends StatefulWidget {
+  const BlindPage({Key? key, required this.title}) : super(key: key);
 
   final String title;
 
   @override
-  State<MyHomePage> createState() => _MyHomePageState();
+  State<BlindPage> createState() => _BlindPageState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
+class _BlindPageState extends State<BlindPage> {
+  Timer? timer;
+  var cur_station;
+  TextEditingController lineController = new TextEditingController();
+  bool notified=false;
+  void  pol () async{
 
-  void _incrementCounter() {
-    setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
-    });
+    var line =lineController.text.trim();
+    var snapshot = await database.ref().child('API/ETA').get();
+    var ETA=1111;
+    if(snapshot.exists){
+      var last =snapshot.value;
+      ETA=last as int;
+     }
+    snapshot = await database.ref().child('API/nearest_bus_id').get();
+    if(snapshot.exists){
+      var last =snapshot.value;
+    }
+    if(ETA<=2 && !notified){
+      bool canVibrate = await Vibrate.canVibrate;
+      Vibrate.vibrate();
+      final Iterable<Duration> pauses = [
+        const Duration(milliseconds: 500),
+        const Duration(milliseconds: 1000),
+        const Duration(milliseconds: 500),
+        const Duration(milliseconds: 500),
+        const Duration(milliseconds: 1000),
+        const Duration(milliseconds: 500),
+      ];
+
+// vibrate - sleep 0.5s - vibrate - sleep 1s - vibrate - sleep 0.5s - vibrate
+      Vibrate.vibrateWithPauses(pauses);
+      notified=true;
+
+    }
+    if(ETA<2){
+        var snapshot_passengers = await database.ref().child('stations/$cur_station/$line/passengers').get();
+        var snapshot_arrived = await database.ref().child('stations/$cur_station/$line/arrived').get();
+        print('aaa');
+        print(snapshot_arrived.value);
+        var latest=snapshot_arrived.value;
+        var ETA=1111;
+        if(snapshot_arrived.exists){
+          if(snapshot_arrived.value==true){
+            print('assad');
+            print(snapshot_passengers.value);
+            int a=snapshot_passengers.value as int;
+            if(a==0){
+              await database.ref().child('stations/$cur_station/$line').remove();
+            }
+            else{await database.ref().child('stations/$cur_station/$line').update( {'passengers':a-1});}
+
+          }
+          print(snapshot_arrived.value);
+      }
+    }
   }
+  @override
+  void initState() {
 
+    super.initState();
+    timer = Timer.periodic(Duration(seconds: 5), (Timer t) => pol());
+
+  }
+  FirebaseDatabase database = FirebaseDatabase.instance;
+
+  Future _getGeoLocationPosition() async {
+    bool serviceEnabled;
+    LocationPermission permission;
+
+    // Test if location services are enabled.
+    serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      await Geolocator.openLocationSettings();
+      return Future.error('Location services are disabled.');
+    }
+
+    permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        // your App should show an explanatory UI now.
+        return Future.error('Location permissions are denied');
+      }
+    }
+
+    if (permission == LocationPermission.deniedForever) {
+      // Permissions are denied forever, handle appropriately.
+      return Future.error(
+          'Location permissions are permanently denied, we cannot request permissions.');
+    }
+
+    // When we reach here, permissions are granted and we can
+    // continue accessing the position of the device.
+    return await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+  }
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
     return Scaffold(
-      appBar: AppBar(
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
+      appBar: AccessAppBar(
+        context,
+        Text(widget.title),
+        Icon(Icons.logout)
       ),
       body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
         child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Invoke "debug painting" (press "p" in the console, choose the
-          // "Toggle Debug Paint" action from the Flutter Inspector in Android
-          // Studio, or the "Toggle Debug Paint" command in Visual Studio Code)
-          // to see the wireframe for each widget.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
-            const Text(
-              'You have pushed the button this many times:',
-            ),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headline4,
-            ),
+            Text('Insert your line and press send'),
+            Container(
+        margin: EdgeInsets.symmetric(
+            horizontal: 50),
+          child: TextFormField(
+            keyboardType: TextInputType.number,
+            controller:
+            lineController,
+            decoration:  InputDecoration(
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10.0),
+                ),
+                filled: true,
+                hintStyle: TextStyle(color: Colors.grey[800]),
+                hintText: "What line do I need?",
+                fillColor: Colors.transparent),
+          )),
+             MaterialButton(
+                color: Colors.blue,
+                child: Text('Submit Current Station'),
+                onPressed:    () async {
+                  Position position = await _getGeoLocationPosition();
+                  var location ='Latitude: ${position.latitude} , Longitude: ${position.longitude}';
+
+                  var stationsDB= await FirebaseFirestore.instance.collection("versions").doc("v1");
+                  var stations = (await stationsDB.collection("stops").get());
+                  double min_dist=10000000;
+                  var dist =0;
+                  var min_stop;
+                  double min_lat=0;
+                  double min_lon=0;
+                  var cur_city='';
+
+                  stations.docs.forEach((element) {
+                      var lat1=element.get('stop_lat');
+                      var long1=element.get('stop_lon');
+                      var lat2=position.latitude;
+                      var long2=position.longitude;
+                      var dist= acos((sin(lat1) * sin(lat2)) + cos(lat1) * cos(lat2) * cos(long2-long1));
+                      if(dist<min_dist){
+                        min_dist=dist;
+                        min_lon=element.get('stop_lon');
+                        min_lat=element.get('stop_lat');
+                        cur_station=element.get('stop_name');
+                        cur_city=element.get('city');
+                        cur_station=element.id;
+                        min_stop=element;
+                      }});
+             print(cur_station);
+             print(lineController.text.trim());
+             var line =lineController.text.trim();
+
+                  //   }
+                  // }
+                  final snapshot = await database.ref().child('stations/$cur_station/$line').get();
+                  var last;
+
+                  print('aaaa');
+                  if (snapshot.exists) {
+                    print('assa');
+                    print(snapshot.value);
+                    last=snapshot.value;
+                    print(last);
+                    last['passengers']+=1;
+                    print(last);
+                  } else {
+                    last={};
+                    print('No data available.');
+                    last['passengers']=1;
+                    last['arrived']=true;
+                    last['nearest_bus_id']=111;
+                  }
+                  print(last);
+                  Map<String,Object?> a={"$line":last};
+                  await database.ref().child('stations/$cur_station').update(a);
+                  print(cur_station);
+                  setState(() {
+
+                  });
+                }
+            )
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
-      ), // This trailing comma makes auto-formatting nicer for build methods.
     );
   }
 }
