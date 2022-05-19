@@ -1,4 +1,5 @@
 import 'package:accesibus/Components/Appbar.dart';
+import 'package:accesibus/driver.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -141,6 +142,7 @@ class _BlindPageState extends State<BlindPage> {
   }
   @override
   Widget build(BuildContext context) {
+    DriverData.getNextStations(15);
     return Scaffold(
       appBar: AccessAppBar(
         context,
