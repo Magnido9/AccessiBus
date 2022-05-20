@@ -1,5 +1,5 @@
 import 'package:accesibus/Components/Appbar.dart';
-import 'package:accesibus/driver.dart';
+import 'package:accesibus/Driver/login.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -29,8 +29,13 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.blueGrey,
         brightness: Brightness.dark,
+        textTheme: TextTheme(
+            headline1: TextStyle(fontSize: 200.0 , fontWeight:FontWeight.w800 ),
+            headline2: TextStyle(fontSize: 20.0 , fontWeight:FontWeight.w600 ),
+            headline3: TextStyle(fontSize: 100.0 , fontWeight:FontWeight.w800 )
+        )
       ),
-      home: const BlindPage(title: 'AccessiBus'),
+      home: const DriverLogin() //const BlindPage(title: 'AccessiBus'),
     );
   }
 }

@@ -36,17 +36,16 @@ class DriverData {
         currStation= stations[currStationidx];
         checkArrived();
     }
-      while(currStationidx <= stations.length) {
+      while(currStationidx < stations.length) {
         List<WaitStation> results = [];
         List<String> threeNearestStation = await getNearestStations(3);
         for (var i = 0; i < threeNearestStation.length; i++) {
+          var a = await getPassengersCount(threeNearestStation[i], line);
           results.add(WaitStation(
-              await getPassengersCount(threeNearestStation[i], line),
+              a,
               threeNearestStation[i]));
-          print("got pass count:");
-          print(await getPassengersCount(threeNearestStation[i], line));
-          print("from station:");
-          print(threeNearestStation[i]);
+          print("got pass count: $a");
+          print("from station: ${threeNearestStation[i]}");
         }
 
         yield results;
@@ -57,7 +56,10 @@ class DriverData {
      List<String> res =[];
 
      for (var i=0; i<numberOfStations; i++){
-       if(i <= stations.length){
+       var len = stations.length as int;
+       i=(i+currStationidx)%len;
+       if(i < stations.length){
+         print("i is good $i");
          res.add(stations[i]);
        }
        else{
@@ -158,7 +160,8 @@ class DriverData {
        var lat2=position.latitude;
        var long2=position.longitude;
        var dist= distance(lat1, long1, lat2, long2);
-       if(dist < 0.01)
+       print("!!!!!!!!!!!!!!!!!!Dist $dist");
+       if(dist < 0.2)
          {
            var lineRef = await database.ref().child('stations/$currStation/$line');
             lineRef.update({"arrived":true});
