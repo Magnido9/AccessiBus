@@ -142,7 +142,6 @@ class _BlindPageState extends State<BlindPage> {
   }
   @override
   Widget build(BuildContext context) {
-    DriverData.getNextStations(15);
     return Scaffold(
       appBar: AccessAppBar(
         context,
